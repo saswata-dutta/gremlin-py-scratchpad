@@ -1,3 +1,7 @@
+import sys
+import subprocess
+import time
+
 from gremlin_python.process.anonymous_traversal import traversal
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 from gremlin_python.process.traversal import T
@@ -74,9 +78,19 @@ def simple(g, vid):
     return g.with_('evaluationTimeout', 30000).V(vid).as_("hop_0").in_().out().path().by(T.id).from_("hop_0").toList()
 
 
-def main():
+def server(gremlin_server_sh, cmd):
+    event = subprocess.run([gremlin_server_sh, cmd], stdout=subprocess.PIPE, text=True, check=True)
+    print(event)
+    assert event.returncode == 0
+
+
+def main(gremlin_server_sh):
     conn = None
     try:
+
+        server(gremlin_server_sh, "start")
+        time.sleep(3) # pause sufficiently to let the server be ready
+
         conn = DriverRemoteConnection('ws://localhost:8182/gremlin','g')
         g = traversal().withRemote(conn)
         drop(g)
@@ -87,8 +101,9 @@ def main():
     finally:
         if conn:
             conn.close()
-
+        server(gremlin_server_sh, "stop")
 
 
 if __name__ == '__main__':
-    main()
+    assert len(sys.argv) == 2, f"Missing Gremlin Server Path"
+    main(sys.argv[1])
